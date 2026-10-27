@@ -1,0 +1,56 @@
+snapshot:
+  name: LinkedIn workflows
+  version: 3
+  as_of: 2026-10-27
+  status: configuration snapshot of the live Lindy setup; not an executable package
+  note: >-
+    Replaces v1 and v2. The four older routines (IDs 6ad9...) no longer exist in
+    this account. Two routines are live. Approval is by email reply only.
+routines:
+  - id: 6ae027e4cb54a09d35b9326a
+    name: LinkedIn post drafts
+    enabled: true
+    timezone: Asia/Jakarta
+    schedule: {kind: daily, hour: 18, minute: 0}
+    delivery: Lindy Mail to italiani1119@gmail.com
+    email_subject: "LinkedIn draft for today: reply SETUJU to publish"
+    behavior: >-
+      Writes one English LinkedIn post (600-1,200 characters, first person,
+      max 3 hashtags, no emojis, no em dashes, ends with one question) for
+      Ita Liani's personal profile. Rotates themes and reads
+      /agent/user/Routines/linkedin-daily/posts-log.md to avoid repeats.
+      Never invents experience, employers, numbers or results. Never
+      publishes in this run. Appends date, theme and first line to the log.
+    themes:
+      - discussion question for executives
+      - remote work and time zones
+      - procurement and vendor tips
+      - tools and automation for assistants
+      - lessons from admin work
+      - opinion with a question
+  - id: 6ae0292e84e4add41afb1343
+    name: Remote job leads
+    enabled: true
+    timezone: Asia/Jakarta
+    schedule: {kind: daily, hour: 8, minute: 0}
+    delivery: Lindy Mail to italiani1119@gmail.com
+    email_subject: Lowongan remote hari ini
+    behavior: >-
+      Searches the web and job boards for open, fully remote Executive
+      Assistant, Executive Secretary, Virtual Assistant, Administrative
+      Assistant, Operations Assistant and Procurement/Vendor Coordination
+      roles posted in the last 7 days that Ita can apply to from Indonesia.
+      Skips links already in /agent/user/Routines/remote-jobs/seen.md.
+      Sends 5-10 best matches, or nothing if none are new. On Mondays adds
+      3-5 new free courses. Never applies or contacts anyone.
+approval_flow:
+  trigger: Ita replies to the draft email (e.g. SETUJU, setuju, approve, ok post)
+  action: Lindy publishes the exact approved text as a PUBLIC post (LinkedIn create-text-post-user), no delay, then confirms by email and marks it posted in posts-log.md
+  changes_requested: Lindy revises and emails a new draft, or publishes if approval was written too
+  no_reply: nothing is published
+one_off:
+  - 2026-10-27 free courses summary emailed to italiani1119@gmail.com
+not_automated:
+  - bulk connection requests
+  - automatic DMs
+  - auto-apply to jobs
