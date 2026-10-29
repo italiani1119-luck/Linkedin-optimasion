@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% set titles = {'setujui': 'Setujui post', 'batalkan': 'Batalkan post', 'revisi': 'Minta revisi'} %}
+{% block title %}{{ titles[action] }} - LinkedIn Auto-Post{% endblock %}
+{% block content %}
+
+{% if result %}
+  <section class="card">
+    <h2>
+      {% if result[0] == 'ok' %}
+        {{ 'Post disetujui' if action == 'setujui' else ('Post dibatalkan' if action == 'batalkan' else 'Draft sudah direvisi') }}
+      {% else %}
+        Tidak bisa diproses
+      {% endif %}
+    </h2>
+    <div class="alert {{ 'ok' if result[0] == 'ok' else 'err' }}">{{ result[1] }}</div>
+    <p class="muted">Status sekarang: <b>{{ post.status|status_label }}</b>{% if post.publish_at %} &middot; jadwal {{ post.publish_at|dt }}{% endif %}</p>
+    {% if action == 'revisi' and result[0] == 'ok' %}
+      <p class="muted">Versi baru:</p>
+      <div class="preview" style="margin:14px 0">
+        <div class="preview-text">{{ post.text }}</div>
+      </div>
+      <p class="muted">Email preview baru sudah dikirim. Setujui dari email atau dari dashboard.</p>
+    {% endif %}
+    <div class="form-actions">
+      <a class="btn primary" href="{{ url_for('index') }}#post-{{ post.id }}">Buka dashboard</a>
+      {% if action == 'setujui' and result[0] == 'ok' and post.status == 'approved' %}
+        <a class="btn ghost" href="{{ url_for('email_action', post_id=post.id, action='revisi', t=revise_token) }}">Minta revisi</a>
+      {% endif %}
+    </div>
+  </section>
+{% else %}
+  <section class="card">
+    <h2>{{ 'Setujui post ini?' if action == 'setujui' else ('Batalkan post ini?' if action == 'batalkan' else 'Minta revisi draft ini?') }}</h2>
+    <p class="muted">Draft #{{ post.id }} untuk tanggal {{ post.post_date }}. Status sekarang: <b>{{ post.status|status_label }}</b>.</p>
+    <div class="preview" style="margin:14px 0">
+      <div class="preview-text">{{ post.text }}</div>
+    </div>
+    {% if action == 'setujui' %}
+      <p class="muted">Setelah disetujui, post dijadwalkan pukul {{ settings.publish_time }} WIB (langsung terbit bila jam itu sudah lewat).</p>
+    {% elif action == 'batalkan' %}
+      <p class="muted">Post yang dibatalkan tidak akan pernah terbit.</p>
+    {% else %}
+      <p class="muted">Draft akan ditulis ulang oleh AI dengan gaya berbeda, lalu preview barunya dikirim ke email Anda. Draft lama tidak akan terbit.</p>
+    {% endif %}
+    <form method="post" action="{{ url_for('email_action', post_id=post.id, action=action) }}">
+      <input type="hidden" name="t" value="{{ token }}">
+      {% if action == 'revisi' %}
+        <label class="field">
+          <span>Arahan revisi (opsional, maks. 1000 karakter)</span>
+          <textarea name="instruction" rows="4" maxlength="1000" placeholder="Contoh: buka dengan momen kerja nyata, lebih fokus ke koordinasi vendor, jangan pakai kata 'remote'."></textarea>
+        </label>
+        <p class="muted small">Kosongkan jika ingin AI memilih sudut yang berbeda sendiri.</p>
+      {% endif %}
+      <div class="form-actions">
+        <button class="btn {{ 'primary' if action == 'setujui' else ('danger' if action == 'batalkan' else '') }}" type="submit">
+          {{ 'Ya, setujui & jadwalkan' if action == 'setujui' else ('Ya, batalkan post' if action == 'batalkan' else 'Tulis ulang & kirim preview baru') }}
+        </button>
+        <a class="btn ghost" href="{{ url_for('index') }}#post-{{ post.id }}">Buka dashboard</a>
+      </div>
+    </form>
+  </section>
+{% endif %}
+
+{% endblock %}

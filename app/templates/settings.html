@@ -1,0 +1,285 @@
+{% extends "base.html" %}
+{% block title %}Pengaturan - LinkedIn Auto-Post{% endblock %}
+{% block content %}
+
+<div class="toolbar">
+  <h2>Pengaturan</h2>
+  <span class="muted">Semua data disimpan lokal di <code>data/app.db</code></span>
+</div>
+
+<section class="card" id="profil">
+  <h3>Profil &amp; Penyedia AI</h3>
+  <p class="muted">Teks profil dipakai untuk menyusun prompt. Konten post ditulis dalam bahasa Inggris. Pilih satu penyedia AI yang aktif.</p>
+  <form method="post" action="{{ url_for('save_profile') }}">
+    <input type="hidden" name="csrf" value="{{ csrf_token }}">
+    <label class="field-label" for="profile_summary">Ringkasan profil</label>
+    <textarea id="profile_summary" name="profile_summary" rows="3">{{ s.profile_summary }}</textarea>
+    <div class="grid-2">
+      <div>
+        <label class="field-label" for="llm_provider">Penyedia AI</label>
+        <select id="llm_provider" name="llm_provider">
+          <option value="openai" {{ 'selected' if s.llm_provider != 'anthropic' }}>OpenAI</option>
+          <option value="anthropic" {{ 'selected' if s.llm_provider == 'anthropic' }}>Claude (Anthropic)</option>
+        </select>
+      </div>
+      <div>
+        <label class="field-label">Status penyedia aktif</label>
+        {% if key_ready %}
+          <p class="provider-status"><span class="badge ok">siap</span> {{ 'Claude' if s.llm_provider == 'anthropic' else 'OpenAI' }} &middot; key dari {{ key_source }}</p>
+        {% else %}
+          <p class="provider-status"><span class="badge warn">belum</span> Key {{ 'Claude' if s.llm_provider == 'anthropic' else 'OpenAI' }} belum ada</p>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="provider-box" data-provider="openai">
+      <h4>OpenAI</h4>
+      <div class="grid-2">
+        <div>
+          <label class="field-label" for="openai_model">Model OpenAI</label>
+          <input id="openai_model" name="openai_model" value="{{ s.openai_model }}" placeholder="gpt-5-mini">
+        </div>
+        <div>
+          <label class="field-label" for="openai_api_key">OpenAI API key
+            {% if openai_source == 'dashboard' %}<span class="badge ok">tersimpan</span>
+            {% elif openai_source == 'environment' %}<span class="badge ok">dari OPENAI_API_KEY</span>
+            {% elif openai_source == 'openai_key.txt' %}<span class="badge ok">dari openai_key.txt</span>
+            {% endif %}
+          </label>
+          <div class="key-row">
+            <input id="openai_api_key" name="openai_api_key" type="password" autocomplete="off"
+                   placeholder="{{ 'Kosongkan untuk mempertahankan key yang ada' if has_key else 'sk-...' }}">
+            <label class="checkline nowrap"><input type="checkbox" data-reveal="openai_api_key"> Tampilkan</label>
+          </div>
+          {% if has_key %}
+            <label class="checkline"><input type="checkbox" name="clear_api_key" value="1"> Hapus key yang tersimpan</label>
+          {% endif %}
+          {% if openai_ready and openai_source != 'dashboard' %}
+            <p class="muted small">Key aktif dibaca dari {{ 'variabel environment OPENAI_API_KEY' if openai_source == 'environment' else 'file openai_key.txt' }}; isian di atas akan menggantikannya.</p>
+          {% endif %}
+          {% if not openai_ready %}
+            <p class="muted small">Tidak bisa paste? Simpan key ke file <code>{{ key_file }}</code> (satu baris berisi key saja), atau set environment <code>OPENAI_API_KEY</code> lalu jalankan ulang <code>run.bat</code>.</p>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <div class="provider-box" data-provider="anthropic">
+      <h4>Claude (Anthropic)</h4>
+      <div class="grid-2">
+        <div>
+          <label class="field-label" for="anthropic_model">Model Claude</label>
+          <input id="anthropic_model" name="anthropic_model" value="{{ s.anthropic_model }}" placeholder="claude-sonnet-5-5">
+        </div>
+        <div>
+          <label class="field-label" for="anthropic_api_key">Claude API key
+            {% if anthropic_source == 'dashboard' %}<span class="badge ok">tersimpan</span>
+            {% elif anthropic_source == 'environment' %}<span class="badge ok">dari ANTHROPIC_API_KEY</span>
+            {% elif anthropic_source == 'anthropic_key.txt' %}<span class="badge ok">dari anthropic_key.txt</span>
+            {% endif %}
+          </label>
+          <div class="key-row">
+            <input id="anthropic_api_key" name="anthropic_api_key" type="password" autocomplete="off"
+                   placeholder="{{ 'Kosongkan untuk mempertahankan key yang ada' if has_anthropic_key else 'sk-ant-...' }}">
+            <label class="checkline nowrap"><input type="checkbox" data-reveal="anthropic_api_key"> Tampilkan</label>
+          </div>
+          {% if has_anthropic_key %}
+            <label class="checkline"><input type="checkbox" name="clear_anthropic_key" value="1"> Hapus key yang tersimpan</label>
+          {% endif %}
+          {% if anthropic_ready and anthropic_source != 'dashboard' %}
+            <p class="muted small">Key aktif dibaca dari {{ 'variabel environment ANTHROPIC_API_KEY' if anthropic_source == 'environment' else 'file anthropic_key.txt' }}; isian di atas akan menggantikannya.</p>
+          {% endif %}
+          {% if not anthropic_ready %}
+            <p class="muted small">Tidak bisa paste? Simpan key ke file <code>{{ anthropic_key_file }}</code> (satu baris berisi key saja), atau set environment <code>ANTHROPIC_API_KEY</code> lalu jalankan ulang <code>run.bat</code>.</p>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <div class="form-actions"><button class="btn primary" type="submit">Simpan profil &amp; penyedia AI</button></div>
+  </form>
+</section>
+
+<section class="card" id="email">
+  <h3>Email preview (Resend)</h3>
+  <p class="muted">Setiap draft baru dikirim ke email Anda untuk ditinjau sebelum terbit. Post tetap tidak akan tayang tanpa persetujuan.</p>
+  <form method="post" action="{{ url_for('save_email') }}">
+    <input type="hidden" name="csrf" value="{{ csrf_token }}">
+    <label class="checkline"><input type="checkbox" name="email_preview_enabled" value="1" {{ 'checked' if s.email_preview_enabled == '1' }}> Kirim preview otomatis setiap draft baru</label>
+    <div class="grid-2">
+      <div>
+        <label class="field-label" for="resend_from">Pengirim (from)</label>
+        <input id="resend_from" name="resend_from" value="{{ s.resend_from }}" placeholder="LinkedIn Bot &lt;nama@domain-anda.com&gt;">
+        <p class="muted small">Harus memakai domain yang sudah terverifikasi di Resend. <code>onboarding@resend.dev</code> hanya bisa mengirim ke email pemilik akun Resend.</p>
+      </div>
+      <div>
+        <label class="field-label" for="resend_to">Email tujuan</label>
+        <input id="resend_to" name="resend_to" value="{{ s.resend_to }}" placeholder="nama@email.com">
+        <p class="muted small">Boleh lebih dari satu, pisahkan dengan koma.</p>
+      </div>
+    </div>
+    <div class="grid-2">
+      <div>
+        <label class="field-label" for="resend_api_key">Resend API key
+          {% if resend_source == 'dashboard' %}<span class="badge ok">tersimpan</span>
+          {% elif resend_source == 'environment' %}<span class="badge ok">dari RESEND_API_KEY</span>
+          {% elif resend_source == 'resend_key.txt' %}<span class="badge ok">dari resend_key.txt</span>
+          {% endif %}
+        </label>
+        <div class="key-row">
+          <input id="resend_api_key" name="resend_api_key" type="password" autocomplete="off"
+                 placeholder="{{ 'Kosongkan untuk mempertahankan key yang ada' if has_resend_key else 're_...' }}">
+          <label class="checkline nowrap"><input type="checkbox" data-reveal="resend_api_key"> Tampilkan</label>
+        </div>
+        {% if has_resend_key %}
+          <label class="checkline"><input type="checkbox" name="clear_resend_key" value="1"> Hapus key yang tersimpan</label>
+        {% endif %}
+        {% if not resend_ready %}
+          <p class="muted small">Tidak bisa paste? Simpan key ke file <code>{{ resend_key_file }}</code> (satu baris berisi key saja), atau set environment <code>RESEND_API_KEY</code> lalu jalankan ulang <code>run.bat</code>.</p>
+        {% endif %}
+      </div>
+      <div>
+        <label class="field-label">Status pengiriman terakhir</label>
+        <p class="provider-status">{{ s.resend_last_status or 'Belum ada email preview yang dikirim.' }}</p>
+      </div>
+    </div>
+    <p class="muted small">Tautan Setujui/Batalkan di email memakai <b>Public base URL</b> (bagian LinkedIn) bila diisi; jika kosong, tautan mengarah ke <code>http://127.0.0.1:8080</code> dan hanya bisa dibuka di komputer ini.</p>
+    <div class="form-actions">
+      <button class="btn primary" type="submit" name="action" value="save">Simpan pengaturan email</button>
+      <button class="btn" type="submit" name="action" value="test">Kirim email uji</button>
+    </div>
+  </form>
+</section>
+
+<section class="card" id="jadwal">
+  <h3>Jadwal otomatisasi</h3>
+  <form method="post" action="{{ url_for('save_schedule') }}">
+    <input type="hidden" name="csrf" value="{{ csrf_token }}">
+    <div class="grid-2">
+      <div>
+        <label class="field-label" for="gen_mode">Interval pembuatan draft</label>
+        <select id="gen_mode" name="gen_mode">
+          <option value="daily" {{ 'selected' if s.gen_mode == 'daily' }}>Setiap hari pada jam tertentu</option>
+          <option value="hours" {{ 'selected' if s.gen_mode == 'hours' }}>Setiap N jam</option>
+          <option value="minutes" {{ 'selected' if s.gen_mode == 'minutes' }}>Setiap N menit</option>
+        </select>
+      </div>
+      <div data-mode="hours,minutes">
+        <label class="field-label" for="gen_every_value">Nilai N</label>
+        <input id="gen_every_value" name="gen_every_value" type="number" min="1" max="10080" value="{{ s.gen_every_value }}">
+      </div>
+      <div data-mode="daily">
+        <label class="field-label" for="gen_daily_time">Jam pembuatan draft (WIB)</label>
+        <input id="gen_daily_time" name="gen_daily_time" value="{{ s.gen_daily_time }}" placeholder="18:30">
+      </div>
+      <div>
+        <label class="field-label">Waktu publikasi</label>
+        <div class="radios">
+          <label><input type="radio" name="publish_mode" value="at_time" {{ 'checked' if s.publish_mode == 'at_time' }}> Pada jam tertentu</label>
+          <label><input type="radio" name="publish_mode" value="immediate" {{ 'checked' if s.publish_mode == 'immediate' }}> Langsung setelah disetujui</label>
+        </div>
+      </div>
+      <div>
+        <label class="field-label" for="publish_time">Jam publikasi (WIB, dipakai untuk mode "Pada jam tertentu")</label>
+        <input id="publish_time" name="publish_time" value="{{ s.publish_time }}" placeholder="19:30">
+      </div>
+    </div>
+    <p class="muted">Jika disetujui setelah jam publikasi lewat, post langsung dicoba terbit. Tanpa persetujuan, post tidak pernah terbit.</p>
+    <div class="form-actions"><button class="btn primary" type="submit">Simpan jadwal</button></div>
+  </form>
+</section>
+
+<section class="card" id="linkedin">
+  <h3>LinkedIn</h3>
+
+  {% if linkedin_ready %}
+    <div class="alert ok">
+      Terhubung sebagai <b>{{ linkedin_name or 'akun LinkedIn' }}</b>.
+      {% if token_expires %}Perkiraan token berakhir: {{ token_expires|dt }}.{% endif %}
+    </div>
+    <form method="post" action="{{ url_for('disconnect_linkedin') }}" class="inline" data-confirm="Putuskan koneksi LinkedIn?">
+      <input type="hidden" name="csrf" value="{{ csrf_token }}">
+      <button class="btn danger" type="submit">Putuskan koneksi</button>
+    </form>
+  {% else %}
+    <div class="alert warn">Belum terhubung. Hubungkan lewat OAuth (perlu tunnel HTTPS) atau tempel access token manual di bawah.</div>
+  {% endif %}
+
+  <form method="post" action="{{ url_for('save_linkedin') }}">
+    <input type="hidden" name="csrf" value="{{ csrf_token }}">
+    <div class="grid-2">
+      <div>
+        <label class="field-label" for="linkedin_client_id">Client ID</label>
+        <input id="linkedin_client_id" name="linkedin_client_id" value="{{ s.linkedin_client_id }}" autocomplete="off">
+      </div>
+      <div>
+        <label class="field-label" for="linkedin_client_secret">Client Secret {% if has_secret %}<span class="badge ok">tersimpan</span>{% endif %}</label>
+        <div class="key-row">
+          <input id="linkedin_client_secret" name="linkedin_client_secret" type="password" autocomplete="off"
+                 placeholder="{{ 'Kosongkan untuk mempertahankan secret yang ada' if has_secret else '' }}">
+          <label class="checkline nowrap"><input type="checkbox" data-reveal="linkedin_client_secret"> Tampilkan</label>
+        </div>
+      </div>
+      <div>
+        <label class="field-label" for="linkedin_version">Versi API LinkedIn</label>
+        <input id="linkedin_version" name="linkedin_version" value="{{ s.linkedin_version }}" placeholder="202601">
+      </div>
+      <div>
+        <label class="field-label" for="public_base_url">Public base URL (HTTPS, untuk callback)</label>
+        <input id="public_base_url" name="public_base_url" value="{{ s.public_base_url }}" placeholder="https://contoh.trycloudflare.com">
+      </div>
+    </div>
+    <p class="muted">Redirect URL yang harus didaftarkan di aplikasi LinkedIn:<br><code>{{ callback_url }}</code></p>
+    <div class="form-actions"><button class="btn primary" type="submit">Simpan kredensial LinkedIn</button></div>
+  </form>
+
+  <div class="connect-row">
+    {% if s.linkedin_client_id and s.linkedin_client_secret and s.public_base_url.startswith('https://') %}
+      <a class="btn primary" href="{{ url_for('linkedin_start') }}">Hubungkan LinkedIn (OAuth)</a>
+      <span class="muted">Buka dashboard lewat URL tunnel, lalu klik tombol ini agar state OAuth cocok.</span>
+    {% else %}
+      <span class="btn disabled">Hubungkan LinkedIn (OAuth)</span>
+      <span class="muted">Lengkapi Client ID, Client Secret, dan Public base URL HTTPS terlebih dahulu.</span>
+    {% endif %}
+  </div>
+
+  <details class="manual-token">
+    <summary>Alternatif: tempel access token manual</summary>
+    <p class="muted">Ambil token dari LinkedIn Developer Portal (OAuth 2.0 tools) dengan scope <code>openid profile w_member_social</code>. Token biasanya berlaku 60 hari; setelah itu tempel token baru atau hubungkan ulang via OAuth.</p>
+    <form method="post" action="{{ url_for('save_linkedin_token') }}">
+      <input type="hidden" name="csrf" value="{{ csrf_token }}">
+      <label class="field-label" for="access_token">Access token</label>
+      <div class="key-row">
+        <input id="access_token" name="access_token" type="password" autocomplete="off" placeholder="AQV...">
+        <label class="checkline nowrap"><input type="checkbox" data-reveal="access_token"> Tampilkan</label>
+      </div>
+      <div class="form-actions"><button class="btn" type="submit">Simpan token</button></div>
+    </form>
+  </details>
+</section>
+
+<section class="card" id="keamanan">
+  <h3>Keamanan dashboard</h3>
+  <p class="muted">Dashboard hanya mendengarkan di 127.0.0.1. Saat memakai tunnel untuk OAuth, URL tunnel bisa diakses publik &mdash; sebaiknya pasang kata sandi dan matikan tunnel setelah LinkedIn terhubung.</p>
+  <form method="post" action="{{ url_for('save_security') }}">
+    <input type="hidden" name="csrf" value="{{ csrf_token }}">
+    <div class="grid-2">
+      <div>
+        <label class="field-label" for="new_password">Kata sandi baru</label>
+        <input id="new_password" name="new_password" type="password" autocomplete="new-password" placeholder="{{ 'Kosongkan jika tidak ingin mengubah' if password_set else 'Minimal 6 karakter' }}">
+      </div>
+      <div>
+        <label class="field-label" for="confirm_password">Ulangi kata sandi</label>
+        <input id="confirm_password" name="confirm_password" type="password" autocomplete="new-password">
+      </div>
+    </div>
+    <div class="form-actions">
+      <button class="btn primary" type="submit">Simpan kata sandi</button>
+      {% if password_set %}
+        <button class="btn danger" type="submit" name="remove_password" value="1" data-confirm="Hapus kata sandi dashboard?">Hapus kata sandi</button>
+      {% endif %}
+    </div>
+  </form>
+</section>
+
+{% endblock %}

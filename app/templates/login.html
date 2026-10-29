@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Masuk - LinkedIn Auto-Post</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body class="login-body">
+  <main class="login-card">
+    <a class="brand" href="{{ url_for('index') }}">LinkedIn Auto-Post</a>
+    <h1>Masuk ke dashboard</h1>
+    <p class="muted">Dashboard ini dilindungi kata sandi.</p>
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for category, message in messages %}
+        <div class="flash {{ 'err' if category == 'err' else 'ok' }}">{{ message }}</div>
+      {% endfor %}
+    {% endwith %}
+    <form method="post" action="{{ url_for('login') }}">
+      <input type="hidden" name="csrf" value="{{ csrf_token }}">
+      <label class="field-label" for="password">Kata sandi</label>
+      <input id="password" name="password" type="password" autocomplete="current-password" autofocus>
+      <div class="form-actions"><button class="btn primary" type="submit">Masuk</button></div>
+    </form>
+  </main>
+</body>
+</html>

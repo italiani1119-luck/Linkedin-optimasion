@@ -1,0 +1,150 @@
+{% extends "base.html" %}
+{% block content %}
+
+<section class="stats">
+  <div class="stat">
+    <span class="label">Draft berikutnya</span>
+    <b>{% if next_gen and next_gen <= now %}segera{% else %}{{ next_gen|dt }}{% endif %}</b>
+    <small>{{ gen_summary }}</small>
+  </div>
+  <div class="stat">
+    <span class="label">Posting berikutnya</span>
+    <b>{% if next_publish %}{{ next_publish|dt }}{% else %}-{% endif %}</b>
+    <small>{{ publish_summary }}</small>
+  </div>
+  <div class="stat">
+    <span class="label">Akses</span>
+    <b>{{ 'Dashboard dikunci' if password_set else 'Lokal saja' }}</b>
+    <small>{{ 'Kata sandi aktif' if password_set else 'Tanpa kata sandi (127.0.0.1)' }}</small>
+  </div>
+</section>
+
+{% if not llm_ready %}
+  <div class="alert warn">{{ llm_name }} API key belum diisi, jadi draft otomatis tidak bisa dibuat. <a href="{{ url_for('settings_page') }}#profil">Isi di Pengaturan</a>.</div>
+{% endif %}
+{% if not linkedin_ready %}
+  <div class="alert warn">LinkedIn belum terhubung, jadi post yang disetujui akan gagal terbit. <a href="{{ url_for('settings_page') }}#linkedin">Hubungkan LinkedIn</a>.</div>
+{% endif %}
+
+<div class="toolbar">
+  <h2>Antrean review</h2>
+  <div class="toolbar-actions">
+    <form method="post" action="{{ url_for('generate_now') }}">
+      <input type="hidden" name="csrf" value="{{ csrf_token }}">
+      <button class="btn" type="submit">Jalankan sekarang</button>
+    </form>
+    <form method="post" action="{{ url_for('new_draft') }}">
+      <input type="hidden" name="csrf" value="{{ csrf_token }}">
+      <button class="btn ghost" type="submit">Buat draft manual</button>
+    </form>
+  </div>
+</div>
+
+{% if not active %}
+  <div class="card empty">
+    <p><b>Belum ada draft.</b></p>
+    <p class="muted">Draft baru dibuat otomatis sesuai jadwal ({{ gen_summary }}). Anda juga bisa membuatnya sekarang dengan tombol di atas, lalu edit dan setujui di sini.</p>
+  </div>
+{% endif %}
+
+{% for post in active %}
+  <article class="card draft" id="post-{{ post.id }}">
+    <header class="draft-head">
+      <div class="draft-title">
+        <span class="badge {{ post.status }}">{{ post.status|status_label }}</span>
+        <span class="muted">Dibuat {{ post.created_at|dt }} &middot; {{ {'openai': 'OpenAI', 'anthropic': 'Claude'}.get(post.source, 'Manual') }}</span>
+      </div>
+      <span class="muted">Untuk tanggal {{ post.post_date }}</span>
+    </header>
+
+    {% if post.error %}
+      <div class="alert err">{{ post.error }}</div>
+    {% endif %}
+    {% if post.status == 'approved' %}
+      <div class="alert info">Disetujui {{ post.approved_at|dt }}{% if post.publish_at %} &middot; dijadwalkan {{ post.publish_at|dt }}{% endif %}</div>
+    {% elif post.status == 'publishing' %}
+      <div class="alert info">Sedang dikirim ke LinkedIn. Tunggu beberapa detik lalu muat ulang halaman.</div>
+    {% endif %}
+
+    <div class="edit-grid">
+      <form method="post" action="{{ url_for('save_draft', post_id=post.id) }}" class="edit-col">
+        <input type="hidden" name="csrf" value="{{ csrf_token }}">
+        <label class="field-label" for="editor-{{ post.id }}">Teks post (bisa diedit)</label>
+        <textarea id="editor-{{ post.id }}" name="text" class="editor" rows="12"
+                  data-counter="count-{{ post.id }}" data-preview="preview-{{ post.id }}"
+                  {{ 'disabled' if post.status == 'publishing' else '' }}>{{ post.text }}</textarea>
+        <div class="editor-foot">
+          <span class="counter" id="count-{{ post.id }}">0 / 3.000 karakter</span>
+          <div class="row-actions">
+            <button class="btn" type="submit" {{ 'disabled' if post.status == 'publishing' else '' }}>Simpan perubahan</button>
+            <button class="btn ghost" type="button" data-copy="editor-{{ post.id }}">Salin teks</button>
+          </div>
+        </div>
+      </form>
+
+      <div class="preview-col">
+        <span class="field-label">Pratinjau tampilan LinkedIn</span>
+        <div class="preview">
+          <div class="preview-head">
+            <span class="avatar">in</span>
+            <div>
+              <b>{{ linkedin_name if linkedin_ready else 'Akun LinkedIn Anda' }}</b>
+              <small>Baru saja &middot; Publik</small>
+            </div>
+          </div>
+          <div class="preview-text" id="preview-{{ post.id }}">{{ post.text }}</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="actions">
+      {% if post.text and post.status in ('pending', 'approved', 'failed') %}
+        <a class="btn ghost" href="{{ revise_link(post.id) }}">Minta revisi</a>
+        <form method="post" action="{{ url_for('email_draft', post_id=post.id) }}" class="inline">
+          <input type="hidden" name="csrf" value="{{ csrf_token }}">
+          <button class="btn ghost" type="submit">Kirim preview ke email</button>
+        </form>
+      {% endif %}
+      {% if post.status in ('pending', 'failed') %}
+        <form method="post" action="{{ url_for('approve_draft', post_id=post.id) }}" class="inline">
+          <input type="hidden" name="csrf" value="{{ csrf_token }}">
+          <button class="btn primary" type="submit" name="when" value="schedule">Setujui &amp; jadwalkan</button>
+          <button class="btn ghost" type="submit" name="when" value="now">Setujui + posting sekarang</button>
+        </form>
+      {% endif %}
+      {% if post.status == 'failed' %}
+        <form method="post" action="{{ url_for('retry_draft', post_id=post.id) }}" class="inline">
+          <input type="hidden" name="csrf" value="{{ csrf_token }}">
+          <button class="btn" type="submit">{{ 'Buat ulang draft' if not post.text else 'Coba posting lagi' }}</button>
+        </form>
+      {% endif %}
+      {% if post.status in ('pending', 'approved', 'failed') %}
+        <form method="post" action="{{ url_for('cancel_draft', post_id=post.id) }}" class="inline" data-confirm="Batalkan draft ini? Post tidak akan dipublikasikan.">
+          <input type="hidden" name="csrf" value="{{ csrf_token }}">
+          <button class="btn danger" type="submit">Batalkan</button>
+        </form>
+      {% endif %}
+      {% if post.status == 'failed' %}
+        <form method="post" action="{{ url_for('delete_draft', post_id=post.id) }}" class="inline" data-confirm="Hapus draft ini permanen?">
+          <input type="hidden" name="csrf" value="{{ csrf_token }}">
+          <button class="btn danger" type="submit">Hapus</button>
+        </form>
+      {% endif %}
+    </div>
+  </article>
+{% endfor %}
+
+{% if recent %}
+  <h2 class="section-title">Baru saja terbit</h2>
+  <div class="card list">
+    {% for post in recent %}
+      <div class="list-row">
+        <span class="badge posted">Terbit</span>
+        <span class="muted">{{ post.posted_at|dt }}</span>
+        <span class="excerpt">{{ post.text[:110] }}{% if post.text|length > 110 %}...{% endif %}</span>
+      </div>
+    {% endfor %}
+  </div>
+{% endif %}
+
+{% endblock %}

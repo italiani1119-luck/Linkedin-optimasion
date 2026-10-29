@@ -1,0 +1,11 @@
+# aplikasi lokal: data & kredensial
+app/.venv/
+app/data/
+app/__pycache__/
+app/*_key.txt
+app/temp_id.txt
+app/cloudflared.exe
+app/vibe_images/
+__pycache__/
+*.pyc
+.DS_Store
