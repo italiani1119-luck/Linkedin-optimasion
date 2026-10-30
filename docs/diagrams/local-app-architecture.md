@@ -73,6 +73,7 @@ stateDiagram-v2
 - Publikasi memakai endpoint `POST /v2/ugcPosts`, bukan `POST /rest/posts`. Endpoint REST
   menerima teks panjang tetapi menyimpan hanya sebagian (draf 898 karakter tersimpan 397
   karakter dan terpotong di tengah kalimat), sedangkan `ugcPosts` menyimpan teks utuh.
-  Pembacaan ulang post lewat API tidak tersedia untuk scope `w_member_social`; verifikasi
-  dilakukan dengan membuka permalink publik, dan penghapusan post salah memakai
-  `DELETE /rest/posts/{urn}`.
+  Pembacaan ulang post lewat API tidak tersedia untuk scope `w_member_social`, jadi setelah
+  terbit scheduler membaca halaman permalink publik (JSON-LD `articleBody`) dan membandingkan
+  panjang/isi teks: bila cocok dicatat di log, bila terpotong muncul peringatan di kolom error
+  draft. Penghapusan post salah memakai `DELETE /rest/posts/{urn}`.

@@ -1,13 +1,14 @@
 """Penjadwal lokal: buat draft berkala + publikasikan hanya draft yang disetujui."""
 import logging
 import threading
+import time
 from datetime import timedelta
 
 import anthropic_client
 import db
 import email_preview
 import prompts
-from linkedin_client import publish_post
+from linkedin_client import fetch_published_text, publish_post
 from openai_client import generate_post
 from util import hhmm, iso, now, parse
 
@@ -160,7 +161,34 @@ def publish_draft(post_id):
         return False
     log.info("Post #%s terbit, urn=%s, karakter=%d", post_id, urn, len(text))
     db.update_post(post_id, status="posted", posted_at=iso(now()), linkedin_urn=urn, error="")
+    _verify_published(post_id, urn, text)
     return True
+
+
+def _verify_published(post_id, urn, text):
+    shown = None
+    for attempt in range(2):
+        if attempt:
+            time.sleep(5)
+        shown = fetch_published_text(urn)
+        if shown is not None:
+            break
+    if shown is None:
+        log.warning("Verifikasi post #%s: halaman publik belum terbaca, cek manual.", post_id)
+        return
+    expected = (text or "").replace("\r\n", "\n").strip()
+    actual = shown.replace("\r\n", "\n").strip()
+    if actual == expected:
+        log.info("Verifikasi post #%s: %d karakter tampil utuh.", post_id, len(actual))
+        return
+    log.warning("Verifikasi post #%s: halaman tampil %d dari %d karakter.", post_id, len(actual), len(expected))
+    db.update_post(
+        post_id,
+        error=(
+            "PERINGATAN: halaman LinkedIn menampilkan %d dari %d karakter. Buka permalink untuk memastikan, "
+            "lalu hapus dan posting ulang bila terpotong." % (len(actual), len(expected))
+        )[:800],
+    )
 
 
 def tick():

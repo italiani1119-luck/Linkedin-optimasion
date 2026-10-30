@@ -1,4 +1,6 @@
 """Klien LinkedIn: OAuth 2.0 (OpenID Connect) dan Posts API."""
+import json
+import re
 from urllib.parse import urlencode
 
 import requests
@@ -9,7 +11,12 @@ AUTH_URL = "https://www.linkedin.com/oauth/v2/authorization"
 TOKEN_URL = "https://www.linkedin.com/oauth/v2/accessToken"
 USERINFO_URL = "https://api.linkedin.com/v2/userinfo"
 POSTS_URL = "https://api.linkedin.com/v2/ugcPosts"
+POST_PAGE_URL = "https://www.linkedin.com/feed/update/%s/"
 SCOPES = "openid profile w_member_social"
+BROWSER_UA = (
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+    "(KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
+)
 
 
 class LinkedInError(RuntimeError):
@@ -110,3 +117,24 @@ def publish_post(access_token, person_sub, text):
         raise LinkedInError("LinkedIn %s: %s" % (resp.status_code, message))
 
     return resp.headers.get("x-restli-id") or resp.headers.get("X-Restli-Id") or ""
+
+
+def fetch_published_text(urn, timeout=20):
+    """Ambil teks post dari halaman publiknya (tanpa login). None jika belum terbaca."""
+    if not urn:
+        return None
+    try:
+        resp = requests.get(POST_PAGE_URL % urn, headers={"User-Agent": BROWSER_UA}, timeout=timeout)
+    except requests.RequestException:
+        return None
+    if resp.status_code != 200:
+        return None
+    for block in re.findall(r"<script[^>]+ld\+json[^>]*>(.*?)</script>", resp.text, re.S):
+        try:
+            data = json.loads(block)
+        except ValueError:
+            continue
+        for item in data if isinstance(data, list) else [data]:
+            if isinstance(item, dict) and item.get("articleBody"):
+                return item["articleBody"]
+    return None
