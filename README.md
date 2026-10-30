@@ -14,7 +14,7 @@ Jadwal tiba ──> Draft dibuat (Claude) ──> Email preview (Resend)
                                             │
                           revisi ◄──────────┤
                                             ▼
-                                   Setujui ──> 19:30 WIB ──> LinkedIn REST API
+                                   Setujui ──> 19:30 WIB ──> LinkedIn API (ugcPosts)
                                    Batalkan ─> tidak pernah terbit
 ```
 

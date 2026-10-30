@@ -74,7 +74,7 @@
                   data-counter="count-{{ post.id }}" data-preview="preview-{{ post.id }}"
                   {{ 'disabled' if post.status == 'publishing' else '' }}>{{ post.text }}</textarea>
         <div class="editor-foot">
-          <span class="counter" id="count-{{ post.id }}">0 / 3.000 karakter</span>
+          <span class="counter" id="count-{{ post.id }}">{{ post.text|length }} karakter</span>
           <div class="row-actions">
             <button class="btn" type="submit" {{ 'disabled' if post.status == 'publishing' else '' }}>Simpan perubahan</button>
             <button class="btn ghost" type="button" data-copy="editor-{{ post.id }}">Salin teks</button>

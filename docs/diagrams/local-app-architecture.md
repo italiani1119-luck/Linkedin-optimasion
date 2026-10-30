@@ -36,7 +36,7 @@ flowchart TD
 
   subgraph PUB["3. Publikasi otomatis"]
     SCH -->|"publish_at <= sekarang"| CLAIM["Klaim atomik<br/>status: publishing"]
-    CLAIM --> LI["LinkedIn REST API<br/>POST /rest/posts"]
+    CLAIM --> LI["LinkedIn API<br/>POST /v2/ugcPosts"]
     LI -->|"x-restli-id"| POSTED["status: posted<br/>+ linkedin_urn"]
   end
   POSTED --> DB
@@ -70,3 +70,9 @@ stateDiagram-v2
   agar tidak ada post ganda.
 - Kredensial (API key, access token) disimpan di database lokal atau file `*_key.txt` yang
   tidak ikut di-commit.
+- Publikasi memakai endpoint `POST /v2/ugcPosts`, bukan `POST /rest/posts`. Endpoint REST
+  menerima teks panjang tetapi menyimpan hanya sebagian (draf 898 karakter tersimpan 397
+  karakter dan terpotong di tengah kalimat), sedangkan `ugcPosts` menyimpan teks utuh.
+  Pembacaan ulang post lewat API tidak tersedia untuk scope `w_member_social`; verifikasi
+  dilakukan dengan membuka permalink publik, dan penghapusan post salah memakai
+  `DELETE /rest/posts/{urn}`.

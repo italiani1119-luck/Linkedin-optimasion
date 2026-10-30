@@ -159,7 +159,7 @@ linkedin-automation/
 ├─ anthropic_client.py  # Claude Messages API
 ├─ resend_client.py     # Resend email API
 ├─ email_preview.py     # render + kirim preview, token setujui/batalkan
-├─ linkedin_client.py   # OAuth 2.0 + POST /rest/posts
+├─ linkedin_client.py   # OAuth 2.0 + POST /v2/ugcPosts (REST /rest/posts memotong teks)
 ├─ tls.py               # pakai trust store OS (antivirus/proxy TLS)
 ├─ templates/ static/   # UI dashboard (bahasa Indonesia)
 ├─ data/app.db          # dibuat saat pertama jalan (jangan di-commit)
@@ -175,4 +175,6 @@ Data post: `post_date`, `text`, `status`, `publish_at`, `posted_at`, `linkedin_u
 
 Sudah diuji di mesin ini (browser, tanpa kredensial asli): pembuatan draft manual dan otomatis (jalur error API), edit + pratinjau langsung, penolakan persetujuan untuk teks kosong, persetujuan terjadwal vs langsung, gate persetujuan (tanpa setujui tidak ada publikasi), publikasi gagal dengan pesan jelas, retry, batal, hapus, Riwayat, pengaturan jadwal (harian/N jam/N menit), kunci kata sandi + login, CSRF, OAuth URL & gate, validasi token LinkedIn (401 asli dari LinkedIn), dan logika waktu scheduler. Batas 3.000 karakter divalidasi di server dan UI, tetapi belum diuji dengan teks sepanjang itu.
 
-Belum diuji dengan kredensial asli: generate nyata via OpenAI dan publish nyata ke LinkedIn (butuh API key dan aplikasi LinkedIn Anda). Tampilan visual tidak dapat di-screenshot di lingkungan ini, tetapi struktur DOM dan CSS sudah diperiksa.
+Sudah diuji dengan kredensial asli: generate nyata via Claude, publish nyata ke LinkedIn lewat OAuth akun pemilik, dan email preview via Resend. Dari uji publish nyata ditemukan bahwa `POST /rest/posts` menyimpan hanya sebagian teks panjang (898 karakter terkirim, 397 karakter tersimpan dan terpotong di tengah kalimat), sedangkan `POST /v2/ugcPosts` menyimpan teks utuh (terverifikasi 907 karakter tampil di permalink). Karena itu publisher memakai `ugcPosts`. API tidak bisa membaca ulang post dengan scope `w_member_social` (`/rest/posts`, `/v2/ugcPosts`, `/v2/shares` GET → 403), jadi verifikasi dilakukan dengan membuka permalink publik, dan post yang salah dihapus lewat `DELETE /rest/posts/{urn}`.
+
+Sudah diuji end-to-end oleh pemilik akun: draft dibuat Claude, email preview terkirim, disetujui dari email, lalu terbit di LinkedIn. Tampilan visual tidak dapat di-screenshot di lingkungan pengembangan, tetapi struktur DOM dan CSS sudah diperiksa.

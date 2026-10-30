@@ -57,6 +57,14 @@ def generation_due(settings, at):
     return at >= target and (not last or last < target)
 
 
+def _call_llm(provider, api_key, settings, prompt):
+    if provider == "anthropic":
+        model = (settings.get("anthropic_model") or "claude-sonnet-5-5").strip()
+        return anthropic_client.generate_post(api_key, model, prompt)
+    model = (settings.get("openai_model") or "gpt-5-mini").strip()
+    return generate_post(api_key, model, prompt)
+
+
 def generate_draft():
     settings = db.all_settings()
     at = now()
@@ -79,12 +87,7 @@ def generate_draft():
     else:
         try:
             prompt = prompts.build_prompt(settings.get("profile_summary", ""), at)
-            if provider == "anthropic":
-                model = (settings.get("anthropic_model") or "claude-sonnet-5-5").strip()
-                text = anthropic_client.generate_post(api_key, model, prompt)
-            else:
-                model = (settings.get("openai_model") or "gpt-5-mini").strip()
-                text = generate_post(api_key, model, prompt)
+            text = _call_llm(provider, api_key, settings, prompt)
             if len(text) > MAX_TEXT:
                 error = "Teks dari %s %d karakter, melebihi batas LinkedIn 3.000. Ringkas dulu sebelum menyetujui." % (label, len(text))
         except Exception as exc:  # kegagalan API tidak boleh mematikan scheduler
@@ -119,12 +122,7 @@ def revise_draft(post_id, instruction=""):
     if instruction:
         prompt += "\n\nOwner's revision request (follow it strictly):\n" + instruction
 
-    if provider == "anthropic":
-        model = (settings.get("anthropic_model") or "claude-sonnet-5-5").strip()
-        text = anthropic_client.generate_post(api_key, model, prompt)
-    else:
-        model = (settings.get("openai_model") or "gpt-5-mini").strip()
-        text = generate_post(api_key, model, prompt)
+    text = _call_llm(provider, api_key, settings, prompt)
     if len(text) > MAX_TEXT:
         raise RuntimeError("Teks hasil revisi melebihi batas LinkedIn 3.000 karakter. Coba lagi.")
     db.update_post(post_id, text=text, status="pending", error="")
@@ -146,12 +144,21 @@ def publish_draft(post_id):
             error="LinkedIn belum terhubung. Buka Pengaturan lalu klik Hubungkan LinkedIn.",
         )
         return False
+    text = post["text"] or ""
+    log.info(
+        "Posting #%s: %d karakter | awal=%r | akhir=%r",
+        post_id,
+        len(text),
+        text[:40],
+        text[-40:],
+    )
     try:
-        urn = publish_post(token, settings.get("linkedin_version"), person, post["text"])
+        urn = publish_post(token, person, text)
     except Exception as exc:
         log.warning("Gagal memposting #%s: %s", post_id, exc)
         db.update_post(post_id, status="failed", error=("Posting gagal: " + str(exc))[:800])
         return False
+    log.info("Post #%s terbit, urn=%s, karakter=%d", post_id, urn, len(text))
     db.update_post(post_id, status="posted", posted_at=iso(now()), linkedin_urn=urn, error="")
     return True
 

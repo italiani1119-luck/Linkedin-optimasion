@@ -8,7 +8,7 @@ import tls  # noqa: F401  (pakai trust store OS untuk TLS)
 AUTH_URL = "https://www.linkedin.com/oauth/v2/authorization"
 TOKEN_URL = "https://www.linkedin.com/oauth/v2/accessToken"
 USERINFO_URL = "https://api.linkedin.com/v2/userinfo"
-POSTS_URL = "https://api.linkedin.com/rest/posts"
+POSTS_URL = "https://api.linkedin.com/v2/ugcPosts"
 SCOPES = "openid profile w_member_social"
 
 
@@ -80,23 +80,22 @@ def fetch_userinfo(access_token):
     return data
 
 
-def publish_post(access_token, version, person_sub, text):
+def publish_post(access_token, person_sub, text):
+    """Kirim satu post. Pakai endpoint ugcPosts: /rest/posts memotong teks panjang saat diterima."""
     body = {
         "author": "urn:li:person:%s" % person_sub,
-        "commentary": text,
-        "visibility": "PUBLIC",
-        "distribution": {
-            "feedDistribution": "MAIN_FEED",
-            "targetEntities": [],
-            "thirdPartyDistributionChannels": [],
-        },
         "lifecycleState": "PUBLISHED",
-        "isReshareDisabledByAuthor": False,
+        "specificContent": {
+            "com.linkedin.ugc.ShareContent": {
+                "shareCommentary": {"text": text},
+                "shareMediaCategory": "NONE",
+            }
+        },
+        "visibility": {"com.linkedin.ugc.MemberNetworkVisibility": "PUBLIC"},
     }
     headers = {
         "Authorization": "Bearer " + access_token,
         "Content-Type": "application/json",
-        "Linkedin-Version": str(version or "202601"),
         "X-Restli-Protocol-Version": "2.0.0",
     }
     try:
